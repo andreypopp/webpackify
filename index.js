@@ -2,7 +2,6 @@
 
 var fs                      = require('fs');
 var exists                  = fs.existsSync;
-var read                    = fs.readFileSync;
 var path                    = require('path');
 var join                    = path.join;
 
@@ -13,6 +12,12 @@ var MemoryInputFileSystem   = require("enhanced-resolve/lib/MemoryInputFileSyste
 
 module.exports = webpackify;
 
+/**
+ * webpackify configurator for webpack compiler
+ *
+ * @param {String} context
+ * @param {Object} options
+ */
 function webpackify(context, options) {
   if (utils.isObject(context)) {
     options = context;

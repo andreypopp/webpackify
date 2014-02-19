@@ -35,7 +35,11 @@ if (argv.version) {
 var webpackify = require('../index');
 var compiler = webpackify(cwd, configureFromArgv(argv));
 
-validateOptions(compiler.options);
+if (!hasEntries(compiler.options)) {
+  errorDocReference(
+    "no entries found, provide via command line arguments or via config",
+    "http://webpack.github.io/docs/configuration.html#entry");
+}
 
 if (argv.watch) {
 
@@ -53,6 +57,13 @@ if (argv.watch) {
     checkCompileWarning(stats);
 
     if (fs) {
+
+      if (Object.keys(fs.data).length > 1) {
+        errorDocReference(
+          "compilation resulted in multiple outputs, you need to provide 'output' option",
+          "http://webpack.github.io/docs/configuration.html#output");
+      }
+
       fs.readFile('/bundle.js', function(err, data) {
         if (err) throw err;
         process.stdout.write(data);
@@ -69,19 +80,19 @@ if (argv.watch) {
  * @param {Object} argv Parsed arguments
  */
 function configureFromArgv(argv) {
+
+  var entry = []
+    .concat(argv._.map(parseModulePath))
+    .filter(Boolean); 
+
   var options = {
-    entry: argv._.map(pathToModuleID),
+    entry: entry,
+
     debug: argv.debug,
     devtool: argv.debug ? 'inline-source-map' : undefined,
+
     module: {
-      loaders: (argv.loader || []).map(function(spec) {
-        if (spec.indexOf(':') > -1) {
-          spec = spec.split(':');
-          return {loader: spec[1], test: new RegExp('\.' + spec[0] + '$')};
-        } else {
-          return {loader: spec};
-        }
-      })
+      loaders: (argv.loader || []).map(parseLoaderSpec)
     }
   };
 
@@ -94,26 +105,18 @@ function configureFromArgv(argv) {
   return options;
 }
 
-function pathToModuleID(path) {
+function parseModulePath(path) {
   if (path[0] !== '.' && path[0] !== '/') return './' + path;
   return path;
 }
 
-function validateOptions(options) {
-
-  if (!utils.isArray(options.entry) && !utils.isString(options.entry)) {
-    errorDocReference(
-      "multiple entries require 'output' configuration",
-      "http://webpack.github.io/docs/configuration.html#output");
+function parseLoaderSpec(spec) {
+  if (spec.indexOf(':') > -1) {
+    spec = spec.split(':');
+    return {loader: spec[1], test: new RegExp('\.' + spec[0] + '$')};
+  } else {
+    return {loader: spec};
   }
-
-  if (utils.isArray(options.entry) && options.entry.length === 0 || !options.entry) {
-    errorDocReference(
-      "no entries found, provide via command line arguments or via config",
-      "http://webpack.github.io/docs/configuration.html#entry");
-  }
-
-  return options;
 }
 
 function checkCompileErrors(stats) {
@@ -141,4 +144,11 @@ function errorDocReference(msg, url) {
   console.error('\nsee relevant section of webpack documentation:');
   console.error(' ', url, '\n');
   process.exit(1);
+}
+
+function hasEntries(options) {
+  return utils.isArray(options.entry) &&
+      options.entry.length > 0 ||
+      !utils.isArray(options.entry) &&
+      options.entry;
 }
