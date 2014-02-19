@@ -69,6 +69,7 @@ function configureDefaults() {
   // we remove the default output because we want to use MemoryOutputFileSystem
   // by default and do not touch the fs
   delete options.output;
+  options.bail = true;
   return options;
 }
 
