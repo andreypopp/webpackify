@@ -5,7 +5,6 @@ var exists                  = fs.existsSync;
 var path                    = require('path');
 var join                    = path.join;
 
-var resolve                 = require('resolve/lib/sync');
 var utils                   = require('lodash');
 var webpack                 = require('webpack');
 var Compiler                = require('webpack/lib/Compiler');
@@ -14,8 +13,9 @@ var WebpackOptionsApply     = require('webpack/lib/WebpackOptionsApply');
 var WebpackOptionsDefaulter = require('webpack/lib/WebpackOptionsDefaulter');
 var MemoryOutputFileSystem  = require('webpack/lib/MemoryOutputFileSystem');
 var MemoryInputFileSystem   = require('enhanced-resolve/lib/MemoryInputFileSystem');
-var getParameterNames       = require('get-parameter-names');
-var construct               = require('construct');
+var createConstructor       = require('construct-from-spec');
+
+var constructPlugin         = createConstructor('plugin', true);
 
 module.exports = webpackify;
 
@@ -40,7 +40,7 @@ function webpackify(context, options) {
       options
   );
 
-  options.plugins = resolvePlugins(options.plugins);
+  options.plugins = resolvePlugins(options.plugins, context);
 
 	var compiler = new Compiler();
 	compiler.options = options;
@@ -127,18 +127,8 @@ function getOutputFileSystem(compiler) {
 function resolvePlugins(plugins, context) {
   if (!plugins) return [];
   return plugins.map(function(p) {
-    return p.constructor === Object ? pluginFromSpec(p) : p;
+    return p.constructor === Object ? constructPlugin(p, context) : p;
   });
-}
-
-function pluginFromSpec(spec, context) {
-  var cls = resolve(spec.plugin, {basedir: context});
-  cls = require(cls);
-  var args = getParameterNames(cls).map(function(name) {
-    return spec[name];
-  });
-  args.unshift(cls);
-  return construct.apply(null, args);
 }
 
 /**
