@@ -1,0 +1,35 @@
+{
+  "name": "webpackify",
+  "version": "0.0.0",
+  "description": "An opinionated interface to webpack compiler",
+  "main": "index.js",
+  "bin": "./bin/webpackify",
+  "dependencies": {
+    "subarg": "~0.0.1",
+    "webpack": "~1.0.0-rc12",
+    "lodash": "~2.4.1",
+    "enhanced-resolve": "~0.7.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/andreypopp/webpackify"
+  },
+  "keywords": [
+    "webpack",
+    "commonjs",
+    "bundler"
+  ],
+  "webpack": {
+    "hello": "world"
+  },
+  "author": "Andrey Popp <8mayday@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andreypopp/webpackify/issues"
+  },
+  "homepage": "https://github.com/andreypopp/webpackify"
+}

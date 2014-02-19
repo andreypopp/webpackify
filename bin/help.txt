@@ -1,0 +1,15 @@
+Usage: webpackify [options] entry ...
+
+A command line interface to webpack compiler. See http://webpack.github.io.
+
+Options:
+
+    -l, --loader ext:id  Add a loader to handle a specified extension.
+      
+            -d, --debug  Build bundle with debug information.
+        
+            -w, --watch  Watch for source changes and rebuild bundle.
+    
+          -v, --version  Print webpack version and exit.
+    
+            -h, --help   Show this message and exit.

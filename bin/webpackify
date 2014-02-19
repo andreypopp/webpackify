@@ -1,0 +1,220 @@
+#!/usr/bin/env node
+
+var fs      = require('fs');
+var exists  = fs.existsSync;
+var read    = fs.readFileSync;
+var path    = require('path');
+var join    = path.join;
+var subarg  = require('subarg');
+
+
+var cwd  = process.cwd();
+
+var argv = subarg(process.argv.slice(2), {
+  alias: {
+    watch: 'w',
+    debug: 'd',
+    help: 'h',
+    version: 'v',
+    loader: 'l',
+    output: 'o'
+  },
+  boolean: ['watch', 'debug', 'help', 'version']
+});
+
+if (argv.help) {
+  console.log(read(join(__dirname, './help.txt'), 'utf8'));
+  process.exit(0);
+}
+
+if (argv.version) {
+  console.log(require('webpack/package.json').version);
+  process.exit(0);
+}
+
+var utils                   = require('lodash');
+var webpack                 = require('webpack');
+var MemoryOutputFileSystem  = require("webpack/lib/MemoryOutputFileSystem");
+var MemoryInputFileSystem   = require("enhanced-resolve/lib/MemoryInputFileSystem");
+
+var defaultOptions = configureDefaults();
+delete defaultOptions.output;
+
+var options = mergeOptions(
+    defaultOptions,
+    configureFromPackageMetadata(cwd),
+    configureFromWebpackConfig(cwd),
+    configureFromArgv(argv)
+);
+options = validateOptions(options);
+
+var compiler = webpack(utils.cloneDeep(options));
+
+if (!options.output) {
+  compiler.outputFileSystem = new MemoryOutputFileSystem({});
+  compiler.outputPath = '/';
+}
+
+if (argv.watch) {
+
+  compiler.watch(200, function(err, stats) {
+    if (err) error(err);
+    checkCompileErrors(stats);
+    checkCompileWarning(stats);
+
+  });
+} else {
+
+  compiler.run(function(err, stats) {
+    if (err) throw err;
+    checkCompileErrors(stats);
+    checkCompileWarning(stats);
+
+    if (compiler.outputFileSystem instanceof MemoryOutputFileSystem) {
+      var fs = new MemoryInputFileSystem(compiler.outputFileSystem.data);
+      fs.readFile('/bundle.js', function(err, data) {
+        if (err) throw err;
+        process.stdout.write(data);
+      });
+    } else {
+      console.log(stats.toString());
+    }
+  });
+}
+
+/**
+ * Provide default options
+ */
+function configureDefaults() {
+  var options = {};
+  new webpack.WebpackOptionsDefaulter().process(options);
+  return options;
+}
+
+/**
+ * Read webpack compiler options from package metadata (package.json)
+ *
+ * @param {String} basedir
+ */
+function configureFromPackageMetadata(basedir) {
+  var filename = join(basedir, 'package.json');
+
+  if (exists(filename)) {
+    var pkg = require(filename);
+    if (pkg.webpack)
+      return pkg.webpack;
+  }
+}
+
+/**
+ * Read webpack compiler options from webpack.config.js module
+ *
+ * @param {String} basedir
+ */
+function configureFromWebpackConfig(basedir) {
+  var filename = join(basedir, 'webpack.config.js');
+
+  if (exists(filename)) {
+    return require(filename);
+  }
+}
+
+/**
+ * Get webpack compiler options from command line arguments
+ *
+ * @param {Object} argv Parsed arguments
+ */
+function configureFromArgv(argv) {
+  var options = {
+    entry: argv._.map(pathToModuleID),
+    debug: argv.debug,
+    devtool: argv.debug ? 'inline-source-map' : undefined,
+    module: {
+      loaders: (argv.loader || []).map(function(spec) {
+        if (spec.indexOf(':') > -1) {
+          spec = spec.split(':');
+          return {loader: spec[1], test: new RegExp('\.' + spec[0] + '$')};
+        } else {
+          return {loader: spec};
+        }
+      })
+    }
+  };
+
+  if (argv.output) {
+    options.output = {
+      filename: argv.output
+    }
+  }
+
+  return options;
+}
+
+function pathToModuleID(path) {
+  if (path[0] !== '.' && path[0] !== '/') return './' + path;
+  return path;
+}
+
+/**
+ * Merge objects into a single object key by key, overriding previous keys.
+ */
+function mergeOptions() {
+  var result = {};
+  Array.prototype.slice.call(arguments).forEach(function(src) {
+    if (!src) {
+      return;
+    }
+    for (var k in src) {
+      if (k === 'output') {
+        result[k] = utils.merge({}, result[k], src[k]);
+      } else {
+        result[k] = src[k];
+      }
+    }
+  });
+  return result;
+}
+
+function validateOptions(options) {
+
+  if (!utils.isArray(options.entry) && !utils.isString(options.entry)) {
+    errorDocReference(
+      "multiple entries require 'output' configuration",
+      "http://webpack.github.io/docs/configuration.html#output");
+  }
+
+  if (utils.isArray(options.entry) && options.entry.length === 0 || !options.entry) {
+    errorDocReference(
+      "no entries found, provide via command line arguments or via config",
+      "http://webpack.github.io/docs/configuration.html#entry");
+  }
+
+  return options;
+}
+
+function checkCompileErrors(stats) {
+  if (!stats.hasErrors()) {
+    return;
+  }
+  var errors = stats.toJson().errors;
+  console.log(errors);
+}
+
+function checkCompileWarning(stats) {
+  if (!stats.hasWarnings()) {
+    return;
+  }
+  error('compile warnings');
+}
+
+function error(msg) {
+  console.error('error:', msg);
+  process.exit(1);
+}
+
+function errorDocReference(msg, url) {
+  console.error('error:', msg);
+  console.error('\nsee relevant section of webpack documentation:');
+  console.error(' ', url, '\n');
+  process.exit(1);
+}
