@@ -5,8 +5,8 @@ var exists  = fs.existsSync;
 var read    = fs.readFileSync;
 var path    = require('path');
 var join    = path.join;
+var utils   = require('lodash');
 var subarg  = require('subarg');
-
 
 var cwd  = process.cwd();
 
@@ -32,28 +32,10 @@ if (argv.version) {
   process.exit(0);
 }
 
-var utils                   = require('lodash');
-var webpack                 = require('webpack');
-var MemoryOutputFileSystem  = require("webpack/lib/MemoryOutputFileSystem");
-var MemoryInputFileSystem   = require("enhanced-resolve/lib/MemoryInputFileSystem");
+var webpackify = require('../index');
+var compiler = webpackify(cwd, configureFromArgv(argv));
 
-var defaultOptions = configureDefaults();
-delete defaultOptions.output;
-
-var options = mergeOptions(
-    defaultOptions,
-    configureFromPackageMetadata(cwd),
-    configureFromWebpackConfig(cwd),
-    configureFromArgv(argv)
-);
-options = validateOptions(options);
-
-var compiler = webpack(utils.cloneDeep(options));
-
-if (!options.output) {
-  compiler.outputFileSystem = new MemoryOutputFileSystem({});
-  compiler.outputPath = '/';
-}
+validateOptions(compiler.options);
 
 if (argv.watch) {
 
@@ -61,17 +43,16 @@ if (argv.watch) {
     if (err) error(err);
     checkCompileErrors(stats);
     checkCompileWarning(stats);
-
   });
+
 } else {
 
-  compiler.run(function(err, stats) {
+  compiler.run(function(err, stats, fs) {
     if (err) throw err;
     checkCompileErrors(stats);
     checkCompileWarning(stats);
 
-    if (compiler.outputFileSystem instanceof MemoryOutputFileSystem) {
-      var fs = new MemoryInputFileSystem(compiler.outputFileSystem.data);
+    if (fs) {
       fs.readFile('/bundle.js', function(err, data) {
         if (err) throw err;
         process.stdout.write(data);
@@ -80,43 +61,6 @@ if (argv.watch) {
       console.log(stats.toString());
     }
   });
-}
-
-/**
- * Provide default options
- */
-function configureDefaults() {
-  var options = {};
-  new webpack.WebpackOptionsDefaulter().process(options);
-  return options;
-}
-
-/**
- * Read webpack compiler options from package metadata (package.json)
- *
- * @param {String} basedir
- */
-function configureFromPackageMetadata(basedir) {
-  var filename = join(basedir, 'package.json');
-
-  if (exists(filename)) {
-    var pkg = require(filename);
-    if (pkg.webpackOptions)
-      return pkg.webpackOptions;
-  }
-}
-
-/**
- * Read webpack compiler options from webpack.config.js module
- *
- * @param {String} basedir
- */
-function configureFromWebpackConfig(basedir) {
-  var filename = join(basedir, 'webpack.config.js');
-
-  if (exists(filename)) {
-    return require(filename);
-  }
 }
 
 /**
@@ -153,26 +97,6 @@ function configureFromArgv(argv) {
 function pathToModuleID(path) {
   if (path[0] !== '.' && path[0] !== '/') return './' + path;
   return path;
-}
-
-/**
- * Merge objects into a single object key by key, overriding previous keys.
- */
-function mergeOptions() {
-  var result = {};
-  Array.prototype.slice.call(arguments).forEach(function(src) {
-    if (!src) {
-      return;
-    }
-    for (var k in src) {
-      if (k === 'output') {
-        result[k] = utils.merge({}, result[k], src[k]);
-      } else {
-        result[k] = src[k];
-      }
-    }
-  });
-  return result;
 }
 
 function validateOptions(options) {
