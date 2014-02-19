@@ -5,10 +5,17 @@ var exists                  = fs.existsSync;
 var path                    = require('path');
 var join                    = path.join;
 
+var resolve                 = require('resolve/lib/sync');
 var utils                   = require('lodash');
 var webpack                 = require('webpack');
-var MemoryOutputFileSystem  = require("webpack/lib/MemoryOutputFileSystem");
-var MemoryInputFileSystem   = require("enhanced-resolve/lib/MemoryInputFileSystem");
+var Compiler                = require('webpack/lib/Compiler');
+var NodeEnvironmentPlugin   = require('webpack/lib/node/NodeEnvironmentPlugin');
+var WebpackOptionsApply     = require('webpack/lib/WebpackOptionsApply');
+var WebpackOptionsDefaulter = require('webpack/lib/WebpackOptionsDefaulter');
+var MemoryOutputFileSystem  = require('webpack/lib/MemoryOutputFileSystem');
+var MemoryInputFileSystem   = require('enhanced-resolve/lib/MemoryInputFileSystem');
+var getParameterNames       = require('get-parameter-names');
+var construct               = require('construct');
 
 module.exports = webpackify;
 
@@ -26,18 +33,22 @@ function webpackify(context, options) {
     options.context = context;
   }
 
-  var comilerOptions = mergeOptions(
+  options = mergeOptions(
       configureDefaults(),
       configureFromPackageMetadata(options.context),
       configureFromWebpackConfig(options.context),
       options
   );
 
-  // prevent webpack from mangling passed options by cloning it
-  var compiler = webpack(utils.cloneDeep(comilerOptions));
+  options.plugins = resolvePlugins(options.plugins);
+
+	var compiler = new Compiler();
+	compiler.options = options;
+	compiler.options = new WebpackOptionsApply().process(options, compiler);
+	new NodeEnvironmentPlugin().apply(compiler);
 
   // setup memory filesystem in case we don't have output defined
-  if (!comilerOptions.output) {
+  if (options.output.memory) {
     compiler.outputFileSystem = new MemoryOutputFileSystem({});
     compiler.outputPath = '/';
   }
@@ -47,13 +58,17 @@ function webpackify(context, options) {
 
   compiler.run = function(cb) {
     run(function(err, stats) {
-      cb(err, stats, memoryFileSystemFromCompiler(compiler));
+      if (err) return cb(err);
+      stats.fs = getOutputFileSystem(compiler);
+      cb(null, stats);
     });
   };
 
   compiler.watch = function(delay, cb) {
     watch(function(err, stats) {
-      cb(err, stats, memoryFileSystemFromCompiler(compiler));
+      if (err) return cb(err);
+      stats.fs = getOutputFileSystem(compiler);
+      cb(null, stats);
     });
   }
 
@@ -64,12 +79,8 @@ function webpackify(context, options) {
  * Provide default options
  */
 function configureDefaults() {
-  var options = {};
+  var options = {bail: true};
   new webpack.WebpackOptionsDefaulter().process(options);
-  // we remove the default output because we want to use MemoryOutputFileSystem
-  // by default and do not touch the fs
-  delete options.output;
-  options.bail = true;
   return options;
 }
 
@@ -101,10 +112,33 @@ function configureFromWebpackConfig(basedir) {
   }
 }
 
-function memoryFileSystemFromCompiler(compiler) {
+/**
+ * Get output filesystem from the compiler
+ *
+ * @param {Compiler} compiler
+ */
+function getOutputFileSystem(compiler) {
   if (compiler.outputFileSystem instanceof MemoryOutputFileSystem) {
     return new MemoryInputFileSystem(compiler.outputFileSystem.data);
   }
+  return compiler.outputFileSystem;
+}
+
+function resolvePlugins(plugins, context) {
+  if (!plugins) return [];
+  return plugins.map(function(p) {
+    return p.constructor === Object ? pluginFromSpec(p) : p;
+  });
+}
+
+function pluginFromSpec(spec, context) {
+  var cls = resolve(spec.plugin, {basedir: context});
+  cls = require(cls);
+  var args = getParameterNames(cls).map(function(name) {
+    return spec[name];
+  });
+  args.unshift(cls);
+  return construct.apply(null, args);
 }
 
 /**
@@ -117,8 +151,16 @@ function mergeOptions() {
       return;
     }
     for (var k in src) {
-      // XXX: implement custom merge strategies for plugins, loaders, ...
-      result[k] = src[k];
+      switch (k) {
+        case 'output':
+          result[k] = utils.merge({}, result[k], src[k]);
+          break;
+        case 'plugins':
+          result[k] = [].concat(result[k]).concat(src[k]).filter(Boolean);
+          break;
+        default:
+          result[k] = src[k];
+      }
     }
   });
   return result;

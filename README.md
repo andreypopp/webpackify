@@ -11,6 +11,18 @@ An opinionated interface to [webpack][] compiler. Provides:
     addition to `webpack.config.js` and configuration via command line options.
     (implemented)
 
+  * Plugins can be specified as specs (w/o code):
+
+    ```
+    plugins: [
+      {
+        plugin: 'webpack/lib/optimize/CommonsChunkPlugin',
+        filenameTemplate: 'common.js'
+      },
+      ...
+    ]
+    ```
+
   * Package-scoped loaders, similar to how browserify runs transforms. (not
     implemented)
 

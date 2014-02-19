@@ -8,7 +8,10 @@
     "subarg": "~0.0.1",
     "webpack": "~1.0.0-rc12",
     "lodash": "~2.4.1",
-    "enhanced-resolve": "~0.7.1"
+    "enhanced-resolve": "~0.7.1",
+    "construct": "~1.0.0",
+    "resolve": "~0.6.1",
+    "get-parameter-names": "git+https://github.com/goatslacker/get-parameter-names.git#master"
   },
   "devDependencies": {},
   "scripts": {

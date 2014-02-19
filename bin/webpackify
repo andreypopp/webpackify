@@ -51,20 +51,20 @@ if (argv.watch) {
 
 } else {
 
-  compiler.run(function(err, stats, fs) {
+  compiler.run(function(err, stats) {
     if (err) throw err;
     checkCompileErrors(stats);
     checkCompileWarning(stats);
 
-    if (fs) {
+    if (compiler.options.output.memory) {
 
-      if (Object.keys(fs.data).length > 1) {
+      if (Object.keys(stats.fs.data).length > 1) {
         errorDocReference(
           "compilation resulted in multiple outputs, you need to provide 'output' option",
           "http://webpack.github.io/docs/configuration.html#output");
       }
 
-      fs.readFile('/bundle.js', function(err, data) {
+      stats.fs.readFile('/bundle.js', function(err, data) {
         if (err) throw err;
         process.stdout.write(data);
       });
@@ -93,6 +93,9 @@ function configureFromArgv(argv) {
 
     module: {
       loaders: (argv.loader || []).map(parseLoaderSpec)
+    },
+    output: {
+      memory: !argv.output
     }
   };
 
