@@ -23,7 +23,7 @@
     "commonjs",
     "bundler"
   ],
-  "webpack": {
+  "webpackOptions": {
     "hello": "world"
   },
   "author": "Andrey Popp <8mayday@gmail.com>",

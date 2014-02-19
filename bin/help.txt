@@ -1,6 +1,18 @@
 Usage: webpackify [options] entry ...
 
-A command line interface to webpack compiler. See http://webpack.github.io.
+A command line interface to webpack compiler.
+
+webpackify configures compiler:
+
+  1. by executing configuration found in webpack.config.js in the current
+     directory
+
+  2. by reading congifuration found in package.json in the current directory,
+     webpack configuration should be stored under "webpackOptions" field
+
+  3. from command line options
+
+See http://webpack.github.io for the documentation.
 
 Options:
 

@@ -101,8 +101,8 @@ function configureFromPackageMetadata(basedir) {
 
   if (exists(filename)) {
     var pkg = require(filename);
-    if (pkg.webpack)
-      return pkg.webpack;
+    if (pkg.webpackOptions)
+      return pkg.webpackOptions;
   }
 }
 
